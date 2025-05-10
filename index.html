@@ -62,7 +62,7 @@
     .scrollable-history::-webkit-scrollbar-thumb:hover {
       background-color: #64748b;
     }
-    input, select {
+    input, select, textarea {
       transition: all 0.2s ease;
       border: 2px solid #e2e8f0;
       border-radius: 8px;
@@ -70,7 +70,7 @@
       width: 100%;
       background: #fff;
     }
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: #0ea5e9;
       box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
@@ -154,11 +154,21 @@
     const [isLocked, setIsLocked] = React.useState(false);
     const [activities, setActivities] = React.useState(() => {
       const savedActivities = localStorage.getItem('activities');
-      return savedActivities ? JSON.parse(savedActivities) : [];
+      try {
+        const parsedActivities = savedActivities ? JSON.parse(savedActivities) : [];
+        return parsedActivities.map(activity => ({
+          ...activity,
+          description: activity.description || ''
+        }));
+      } catch (e) {
+        console.error('Error parsing activities from localStorage:', e);
+        return [];
+      }
     });
     const [selectedActivity, setSelectedActivity] = React.useState('');
     const [newActivity, setNewActivity] = React.useState('');
     const [newValue, setNewValue] = React.useState('');
+    const [newDescription, setNewDescription] = React.useState('');
     const [time, setTime] = React.useState(0);
     const [earnings, setEarnings] = React.useState(0);
     const [isDeepWork, setIsDeepWork] = React.useState(false);
@@ -166,7 +176,6 @@
       const savedHistory = localStorage.getItem('history');
       try {
         const parsedHistory = savedHistory ? JSON.parse(savedHistory) : [];
-        // Convert old entries with only 'date' to 'timestamp'
         return parsedHistory.map(entry => {
           if (entry.timestamp) return entry;
           if (entry.date && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
@@ -194,12 +203,13 @@
     });
     const [manualActivity, setManualActivity] = React.useState('');
     const [manualDate, setManualDate] = React.useState(new Date().toISOString().split('T')[0]);
-    const [manualTime, setManualTime] = React.useState(new Date().toTimeString().slice(0, 5)); // e.g., "14:30"
+    const [manualTime, setManualTime] = React.useState(new Date().toTimeString().slice(0, 5));
     const [manualMinutes, setManualMinutes] = React.useState('');
     const [manualDeepWork, setManualDeepWork] = React.useState(false);
     const [editIndex, setEditIndex] = React.useState(null);
     const [editName, setEditName] = React.useState('');
     const [editValue, setEditValue] = React.useState('');
+    const [editDescription, setEditDescription] = React.useState('');
 
     const timerRef = React.useRef(null);
 
@@ -222,7 +232,7 @@
       if (isLocked) {
         const activity = activities.find(a => a.name === selectedActivity);
         const newHistoryEntry = {
-          timestamp: new Date().toISOString(), // Full ISO timestamp, e.g., "2025-05-10T14:30:00.000Z"
+          timestamp: new Date().toISOString(),
           activity: selectedActivity,
           time: time,
           earnings: earnings,
@@ -255,10 +265,15 @@
 
     const addActivity = () => {
       if (newActivity && newValue && !isNaN(newValue) && newValue > 0) {
-        const newActivities = [...activities, { name: newActivity, value: parseFloat(newValue) }];
+        const newActivities = [...activities, {
+          name: newActivity,
+          value: parseFloat(newValue),
+          description: newDescription || ''
+        }];
         setActivities(newActivities);
         setNewActivity('');
         setNewValue('');
+        setNewDescription('');
       } else {
         alert('Please enter a valid activity name and hourly value.');
       }
@@ -290,6 +305,7 @@
       setEditIndex(index);
       setEditName(activity.name);
       setEditValue(activity.value.toString());
+      setEditDescription(activity.description);
     };
 
     const saveEdit = () => {
@@ -306,7 +322,11 @@
         return;
       }
       const updatedActivities = [...activities];
-      updatedActivities[editIndex] = { name: editName, value: parseFloat(editValue) };
+      updatedActivities[editIndex] = {
+        name: editName,
+        value: parseFloat(editValue),
+        description: editDescription || ''
+      };
       setActivities(updatedActivities);
 
       // Update history entries with the new activity name
@@ -326,12 +346,14 @@
       setEditIndex(null);
       setEditName('');
       setEditValue('');
+      setEditDescription('');
     };
 
     const cancelEdit = () => {
       setEditIndex(null);
       setEditName('');
       setEditValue('');
+      setEditDescription('');
     };
 
     const deleteHistoryEntry = (originalIndex) => {
@@ -361,11 +383,11 @@
         return;
       }
       const activity = activities.find(a => a.name === manualActivity);
-      const timeInSeconds = parseFloat(manualMinutes) * 60; // Convert minutes to seconds
+      const timeInSeconds = parseFloat(manualMinutes) * 60;
       const multiplier = manualDeepWork ? 3 : 1;
-      const earnings = (activity.value * (parseFloat(manualMinutes) / 60)) * multiplier; // Convert minutes to hours for earnings
+      const earnings = (activity.value * (parseFloat(manualMinutes) / 60)) * multiplier;
       const newHistoryEntry = {
-        timestamp: `${manualDate}T${manualTime}:00.000Z`, // e.g., "2025-05-10T14:30:00.000Z"
+        timestamp: `${manualDate}T${manualTime}:00.000Z`,
         activity: manualActivity,
         time: timeInSeconds,
         earnings: earnings,
@@ -401,7 +423,7 @@
           hour: '2-digit',
           minute: '2-digit',
           hour12: false
-        }).replace(',', ''); // e.g., "05/10/2025 14:30"
+        }).replace(',', '');
       } catch {
         return 'Invalid Date';
       }
@@ -486,6 +508,13 @@
             onChange={e => setNewValue(e.target.value)}
             className="mb-3"
           />
+          <textarea
+            placeholder="Description"
+            value={newDescription}
+            onChange={e => setNewDescription(e.target.value)}
+            className="mb-3"
+            rows="4"
+          />
           <button
             onClick={addActivity}
             className="btn-primary w-full"
@@ -512,6 +541,13 @@
                 onChange={e => setEditValue(e.target.value)}
                 className="mb-3"
               />
+              <textarea
+                placeholder="Description"
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                className="mb-3"
+                rows="4"
+              />
               <div className="flex gap-2">
                 <button
                   onClick={saveEdit}
@@ -535,8 +571,13 @@
                 <div className="scrollable-activities">
                   <ul className="space-y-2">
                     {activities.map((activity, index) => (
-                      <li key={index} className="flex justify-between items-center">
-                        <span className="text-gray-700">{activity.name} (${activity.value}/hr)</span>
+                      <li key={index} className="flex justify-between items-start">
+                        <div className="text-gray-700">
+                          <span className="font-medium">{activity.name}</span> (${activity.value}/hr)
+                          {activity.description && (
+                            <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => startEditing(index)}
@@ -619,7 +660,6 @@
             <div className="scrollable-history">
               <ul className="space-y-4">
                 {history.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map((entry, displayIndex) => {
-                  // Find the original index in the unsorted history array
                   const originalIndex = history.findIndex(h =>
                     h.timestamp === entry.timestamp &&
                     h.activity === entry.activity &&
