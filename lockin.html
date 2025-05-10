@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lock In App</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.20.15/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.3/lib/index.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+    .app-container {
+      max-width: 900px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      margin: 1rem;
+    }
+    .card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid #e2e8f0;
+    }
+    .earnings-card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid #e2e8f0;
+      width: 250px;
+    }
+    .scrollable-activities, .scrollable-history {
+      max-height: 200px;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+    .scrollable-activities::-webkit-scrollbar,
+    .scrollable-history::-webkit-scrollbar {
+      width: 6px;
+    }
+    .scrollable-activities::-webkit-scrollbar-thumb,
+    .scrollable-history::-webkit-scrollbar-thumb {
+      background-color: #94a3b8;
+      border-radius: 3px;
+    }
+    .scrollable-activities::-webkit-scrollbar-thumb:hover,
+    .scrollable-history::-webkit-scrollbar-thumb:hover {
+      background-color: #64748b;
+    }
+    input, select {
+      transition: all 0.2s ease;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.75rem;
+      width: 100%;
+      background: #fff;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+    }
+    button {
+      transition: all 0.2s ease;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-weight: 500;
+    }
+    .btn-primary {
+      background: linear-gradient(to right, #0ea5e9, #2563eb);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(to right, #0891b2, #1e40af);
+    }
+    .btn-danger {
+      background: linear-gradient(to right, #ef4444, #b91c1c);
+      color: white;
+    }
+    .btn-danger:hover {
+      background: linear-gradient(to right, #dc2626, #991b1b);
+    }
+    .btn-edit {
+      background: linear-gradient(to right, #f59e0b, #d97706);
+      color: white;
+    }
+    .btn-edit:hover {
+      background: linear-gradient(to right, #e17c07, #b45309);
+    }
+    .btn-cancel {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .btn-cancel:hover {
+      background: #cbd5e1;
+    }
+    .btn-lock {
+      background: linear-gradient(to right, #22c55e, #16a34a);
+    }
+    .btn-lock.locked {
+      background: linear-gradient(to right, #ef4444, #b91c1c);
+    }
+    .btn-lock:hover {
+      filter: brightness(0.9);
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      color: #334155;
+    }
+    h2 {
+      color: #1e293b;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 768px) {
+      .app-container {
+        padding: 1.5rem;
+      }
+      .card, .earnings-card {
+        padding: 1rem;
+      }
+      .earnings-card {
+        width: 100%;
+        margin-top: 1rem;
+      }
+      .top-container {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  function App() {
+    const [isLocked, setIsLocked] = React.useState(false);
+    const [activities, setActivities] = React.useState(() => {
+      const savedActivities = localStorage.getItem('activities');
+      return savedActivities ? JSON.parse(savedActivities) : [];
+    });
+    const [selectedActivity, setSelectedActivity] = React.useState('');
+    const [newActivity, setNewActivity] = React.useState('');
+    const [newValue, setNewValue] = React.useState('');
+    const [time, setTime] = React.useState(0);
+    const [earnings, setEarnings] = React.useState(0);
+    const [isDeepWork, setIsDeepWork] = React.useState(false);
+    const [history, setHistory] = React.useState(() => {
+      const savedHistory = localStorage.getItem('history');
+      try {
+        const parsedHistory = savedHistory ? JSON.parse(savedHistory) : [];
+        // Convert old entries with only 'date' to 'timestamp'
+        return parsedHistory.map(entry => {
+          if (entry.timestamp) return entry;
+          if (entry.date && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
+            return { ...entry, timestamp: `${entry.date}T00:00:00.000Z` };
+          }
+          return null;
+        }).filter(entry => entry !== null);
+      } catch (e) {
+        console.error('Error parsing history from localStorage:', e);
+        return [];
+      }
+    });
+    const [todayEarnings, setTodayEarnings] = React.useState(() => {
+      const today = new Date().toISOString().split('T')[0];
+      const savedHistory = localStorage.getItem('history');
+      try {
+        const todayHistory = savedHistory
+          ? JSON.parse(savedHistory).filter(h => h.timestamp && h.timestamp.startsWith(today))
+          : [];
+        return todayHistory.reduce((sum, h) => sum + h.earnings, 0);
+      } catch (e) {
+        console.error('Error calculating todayEarnings:', e);
+        return 0;
+      }
+    });
+    const [manualActivity, setManualActivity] = React.useState('');
+    const [manualDate, setManualDate] = React.useState(new Date().toISOString().split('T')[0]);
+    const [manualTime, setManualTime] = React.useState(new Date().toTimeString().slice(0, 5)); // e.g., "14:30"
+    const [manualMinutes, setManualMinutes] = React.useState('');
+    const [manualDeepWork, setManualDeepWork] = React.useState(false);
+    const [editIndex, setEditIndex] = React.useState(null);
+    const [editName, setEditName] = React.useState('');
+    const [editValue, setEditValue] = React.useState('');
+
+    const timerRef = React.useRef(null);
+
+    React.useEffect(() => {
+      localStorage.setItem('activities', JSON.stringify(activities));
+    }, [activities]);
+
+    React.useEffect(() => {
+      localStorage.setItem('history', JSON.stringify(history));
+      const today = new Date().toISOString().split('T')[0];
+      const todayHistory = history.filter(h => h.timestamp && h.timestamp.startsWith(today));
+      setTodayEarnings(todayHistory.reduce((sum, h) => sum + h.earnings, 0));
+    }, [history]);
+
+    const handleLockToggle = () => {
+      if (!selectedActivity) {
+        alert('Please select an activity first!');
+        return;
+      }
+      if (isLocked) {
+        const activity = activities.find(a => a.name === selectedActivity);
+        const newHistoryEntry = {
+          timestamp: new Date().toISOString(), // Full ISO timestamp, e.g., "2025-05-10T14:30:00.000Z"
+          activity: selectedActivity,
+          time: time,
+          earnings: earnings,
+          valuePerHour: activity.value,
+          isDeepWork: isDeepWork
+        };
+        setHistory([...history, newHistoryEntry]);
+        setTodayEarnings(prev => prev + earnings);
+        setTime(0);
+        setEarnings(0);
+        setIsDeepWork(false);
+      }
+      setIsLocked(!isLocked);
+    };
+
+    React.useEffect(() => {
+      if (isLocked) {
+        const activity = activities.find(a => a.name === selectedActivity);
+        const multiplier = isDeepWork ? 3 : 1;
+        const valuePerSecond = activity ? (activity.value * multiplier) / 3600 : 0;
+        timerRef.current = setInterval(() => {
+          setTime(prev => prev + 1);
+          setEarnings(prev => prev + valuePerSecond);
+        }, 1000);
+      } else {
+        clearInterval(timerRef.current);
+      }
+      return () => clearInterval(timerRef.current);
+    }, [isLocked, selectedActivity, activities, isDeepWork]);
+
+    const addActivity = () => {
+      if (newActivity && newValue && !isNaN(newValue) && newValue > 0) {
+        const newActivities = [...activities, { name: newActivity, value: parseFloat(newValue) }];
+        setActivities(newActivities);
+        setNewActivity('');
+        setNewValue('');
+      } else {
+        alert('Please enter a valid activity name and hourly value.');
+      }
+    };
+
+    const deleteActivity = (index) => {
+      const activityToDelete = activities[index];
+      if (isLocked && selectedActivity === activityToDelete.name) {
+        alert('Cannot delete an activity that is currently locked in.');
+        return;
+      }
+      if (history.some(entry => entry.activity === activityToDelete.name)) {
+        alert('Cannot delete an activity that has history entries.');
+        return;
+      }
+      const updatedActivities = activities.filter((_, i) => i !== index);
+      setActivities(updatedActivities);
+      if (selectedActivity === activityToDelete.name) {
+        setSelectedActivity('');
+      }
+    };
+
+    const startEditing = (index) => {
+      const activity = activities[index];
+      if (isLocked && selectedActivity === activity.name) {
+        alert('Cannot edit an activity that is currently locked in.');
+        return;
+      }
+      setEditIndex(index);
+      setEditName(activity.name);
+      setEditValue(activity.value.toString());
+    };
+
+    const saveEdit = () => {
+      if (!editName) {
+        alert('Activity name cannot be empty.');
+        return;
+      }
+      if (!editValue || isNaN(editValue) || editValue <= 0) {
+        alert('Please enter a valid hourly value (greater than 0).');
+        return;
+      }
+      if (activities.some((a, i) => i !== editIndex && a.name === editName)) {
+        alert('Activity name must be unique.');
+        return;
+      }
+      const updatedActivities = [...activities];
+      updatedActivities[editIndex] = { name: editName, value: parseFloat(editValue) };
+      setActivities(updatedActivities);
+
+      // Update history entries with the new activity name
+      const updatedHistory = history.map(entry =>
+        entry.activity === activities[editIndex].name
+          ? { ...entry, activity: editName }
+          : entry
+      );
+      setHistory(updatedHistory);
+
+      // Update selectedActivity if it matches the edited activity
+      if (selectedActivity === activities[editIndex].name) {
+        setSelectedActivity(editName);
+      }
+
+      // Clear edit state
+      setEditIndex(null);
+      setEditName('');
+      setEditValue('');
+    };
+
+    const cancelEdit = () => {
+      setEditIndex(null);
+      setEditName('');
+      setEditValue('');
+    };
+
+    const deleteHistoryEntry = (originalIndex) => {
+      const entry = history[originalIndex];
+      const updatedHistory = history.filter((_, i) => i !== originalIndex);
+      setHistory(updatedHistory);
+      if (entry.timestamp.startsWith(new Date().toISOString().split('T')[0])) {
+        setTodayEarnings(prev => Math.max(0, prev - entry.earnings));
+      }
+    };
+
+    const addManualHistoryEntry = () => {
+      if (!manualActivity) {
+        alert('Please select an activity.');
+        return;
+      }
+      if (!manualDate || !/^\d{4}-\d{2}-\d{2}$/.test(manualDate)) {
+        alert('Please enter a valid date in YYYY-MM-DD format.');
+        return;
+      }
+      if (!manualTime || !/^\d{2}:\d{2}$/.test(manualTime)) {
+        alert('Please enter a valid time in HH:MM format.');
+        return;
+      }
+      if (!manualMinutes || isNaN(manualMinutes) || manualMinutes <= 0) {
+        alert('Please enter a valid number of minutes (greater than 0).');
+        return;
+      }
+      const activity = activities.find(a => a.name === manualActivity);
+      const timeInSeconds = parseFloat(manualMinutes) * 60; // Convert minutes to seconds
+      const multiplier = manualDeepWork ? 3 : 1;
+      const earnings = (activity.value * (parseFloat(manualMinutes) / 60)) * multiplier; // Convert minutes to hours for earnings
+      const newHistoryEntry = {
+        timestamp: `${manualDate}T${manualTime}:00.000Z`, // e.g., "2025-05-10T14:30:00.000Z"
+        activity: manualActivity,
+        time: timeInSeconds,
+        earnings: earnings,
+        valuePerHour: activity.value,
+        isDeepWork: manualDeepWork
+      };
+      setHistory([...history, newHistoryEntry]);
+      if (newHistoryEntry.timestamp.startsWith(new Date().toISOString().split('T')[0])) {
+        setTodayEarnings(prev => prev + earnings);
+      }
+      setManualActivity('');
+      setManualDate(new Date().toISOString().split('T')[0]);
+      setManualTime(new Date().toTimeString().slice(0, 5));
+      setManualMinutes('');
+      setManualDeepWork(false);
+    };
+
+    const formatTime = (seconds) => {
+      seconds = Math.max(0, seconds);
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const formatTimestamp = (timestamp) => {
+      try {
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).replace(',', ''); // e.g., "05/10/2025 14:30"
+      } catch {
+        return 'Invalid Date';
+      }
+    };
+
+    const totalTime = history.reduce((sum, entry) => sum + entry.time, 0);
+    const totalEarnings = history.reduce((sum, entry) => sum + entry.earnings, 0);
+
+    // Debug: Log the sorted history to verify order
+    React.useEffect(() => {
+      if (history.length > 0) {
+        const sortedHistory = history.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        console.log('Sorted History:', sortedHistory.map(h => ({ timestamp: h.timestamp, activity: h.activity })));
+      }
+    }, [history]);
+
+    return (
+      <div className="app-container">
+        <div className="top-container flex justify-between items-start mb-6 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">Lock In App</h1>
+            <div className="card">
+              <h2 className="text-xl">Lock In Session</h2>
+              <select
+                value={selectedActivity}
+                onChange={e => setSelectedActivity(e.target.value)}
+                className="mb-3"
+                disabled={isLocked}
+              >
+                <option value="">Select an activity</option>
+                {activities.map((activity, index) => (
+                  <option key={index} value={activity.name}>
+                    {activity.name} (${activity.value}/hr)
+                  </option>
+                ))}
+              </select>
+              <label className="checkbox-label mb-3">
+                <input
+                  type="checkbox"
+                  checked={isDeepWork}
+                  onChange={e => setIsDeepWork(e.target.checked)}
+                  disabled={isLocked}
+                />
+                Deep Work (3x Earnings)
+              </label>
+              <button
+                onClick={handleLockToggle}
+                className={`btn-lock w-full ${isLocked ? 'locked' : ''}`}
+              >
+                <i className={`fas ${isLocked ? 'fa-lock' : 'fa-unlock'} mr-2`}></i>
+                {isLocked ? 'Lock Out' : 'Lock In'}
+              </button>
+              {isLocked && (
+                <div className="mt-4 text-center text-gray-700">
+                  <p className="text-lg">Time: {formatTime(time)}</p>
+                  <p className="text-lg">Earnings: ${earnings.toFixed(2)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="earnings-card ml-4">
+            <h2 className="text-lg">Earnings</h2>
+            <p className="text-gray-700">Today's Earnings: <span className="text-teal-600">${todayEarnings.toFixed(2)}</span></p>
+            <p className="text-gray-700">Total Time: {formatTime(totalTime)}</p>
+            <p className="text-gray-700">Total Earnings: <span className="text-teal-600">${totalEarnings.toFixed(2)}</span></p>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl">Add New Activity</h2>
+          <input
+            type="text"
+            placeholder="Activity Name"
+            value={newActivity}
+            onChange={e => setNewActivity(e.target.value)}
+            className="mb-3"
+          />
+          <input
+            type="number"
+            placeholder="Value per hour ($)"
+            value={newValue}
+            onChange={e => setNewValue(e.target.value)}
+            className="mb-3"
+          />
+          <button
+            onClick={addActivity}
+            className="btn-primary w-full"
+          >
+            <i className="fas fa-plus mr-2"></i>Add Activity
+          </button>
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl">Activities</h2>
+          {editIndex !== null ? (
+            <div>
+              <input
+                type="text"
+                placeholder="Activity Name"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="mb-3"
+              />
+              <input
+                type="number"
+                placeholder="Value per hour ($)"
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                className="mb-3"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={saveEdit}
+                  className="btn-primary flex-1"
+                >
+                  <i className="fas fa-save mr-2"></i>Save
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  className="btn-cancel flex-1"
+                >
+                  <i className="fas fa-times mr-2"></i>Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activities.length === 0 ? (
+                <p className="text-gray-500">No activities added yet.</p>
+              ) : (
+                <div className="scrollable-activities">
+                  <ul className="space-y-2">
+                    {activities.map((activity, index) => (
+                      <li key={index} className="flex justify-between items-center">
+                        <span className="text-gray-700">{activity.name} (${activity.value}/hr)</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEditing(index)}
+                            className="btn-edit text-sm py-1 px-2"
+                            disabled={isLocked && selectedActivity === activity.name}
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button
+                            onClick={() => deleteActivity(index)}
+                            className="btn-danger text-sm py-1 px-2"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl">Add Manual History Entry</h2>
+          <select
+            value={manualActivity}
+            onChange={e => setManualActivity(e.target.value)}
+            className="mb-3"
+          >
+            <option value="">Select an activity</option>
+            {activities.map((activity, index) => (
+              <option key={index} value={activity.name}>
+                {activity.name} (${activity.value}/hr)
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={manualDate}
+            onChange={e => setManualDate(e.target.value)}
+            className="mb-3"
+          />
+          <input
+            type="time"
+            value={manualTime}
+            onChange={e => setManualTime(e.target.value)}
+            className="mb-3"
+          />
+          <input
+            type="number"
+            placeholder="Minutes spent"
+            value={manualMinutes}
+            onChange={e => setManualMinutes(e.target.value)}
+            className="mb-3"
+            step="0.1"
+          />
+          <label className="checkbox-label mb-3">
+            <input
+              type="checkbox"
+              checked={manualDeepWork}
+              onChange={e => setManualDeepWork(e.target.checked)}
+            />
+            Deep Work (3x Earnings)
+          </label>
+          <button
+            onClick={addManualHistoryEntry}
+            className="btn-primary w-full"
+          >
+            <i className="fas fa-plus mr-2"></i>Add Manual Entry
+          </button>
+        </div>
+
+        <div className="card">
+          <h2 className="text-xl">History</h2>
+          {history.length === 0 ? (
+            <p className="text-gray-500">No activities recorded yet.</p>
+          ) : (
+            <div className="scrollable-history">
+              <ul className="space-y-4">
+                {history.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map((entry, displayIndex) => {
+                  // Find the original index in the unsorted history array
+                  const originalIndex = history.findIndex(h =>
+                    h.timestamp === entry.timestamp &&
+                    h.activity === entry.activity &&
+                    h.time === entry.time &&
+                    h.earnings === entry.earnings
+                  );
+                  return (
+                    <li key={originalIndex} className="border-b pb-2">
+                      <p><strong>Date & Time:</strong> {formatTimestamp(entry.timestamp)}</p>
+                      <p><strong>Activity:</strong> {entry.activity} (${entry.valuePerHour}/hr)</p>
+                      <p><strong>Time:</strong> {formatTime(entry.time)}</p>
+                      <p><strong>Earnings:</strong> ${entry.earnings.toFixed(2)}</p>
+                      <p><strong>Deep Work:</strong> {entry.isDeepWork ? 'Yes (3x)' : 'No'}</p>
+                      <button
+                        onClick={() => deleteHistoryEntry(originalIndex)}
+                        className="btn-danger text-sm py-1 px-2 mt-2"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
